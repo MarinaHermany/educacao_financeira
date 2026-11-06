@@ -1,17 +1,22 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { NavigationContainer } from '@react-navigation/native';
+import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
 import { ActivityIndicator, StyleSheet, View } from 'react-native';
 import { useEffect, useState } from 'react';
 import Login from './screens/Login';
 import CadastroUsuario from './screens/CadastroUsuario';
 import Home from './screens/Home';
-import Produtos from './screens/Produtos';
-import Usuarios from './screens/Usuarios';
+import Aprendizado from './screens/Aprendizado';
+import Simulador from './screens/Simulador';
+import Historico from './screens/Historico';
 import { API } from './services/api.js';
+
+const Stack = createNativeStackNavigator();
 
 export default function App() {
   const [usuario, setUsuario] = useState(null);
-  const [tela, setTela] = useState('login');
+  const [autenticado, setAutenticado] = useState(false);
   const [carregando, setCarregando] = useState(true);
 
   async function carregarSessao() {
@@ -21,7 +26,7 @@ export default function App() {
 
       if (!token) {
         setUsuario(null);
-        setTela('login');
+        await AsyncStorage.removeItem('usuario');
         return;
       }
 
@@ -32,20 +37,19 @@ export default function App() {
       });
 
       if (!resposta.ok) {
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('usuario');
+        await AsyncStorage.multiRemove(['token', 'usuario']);
         setUsuario(null);
-        setTela('login');
         return;
       }
 
       const dados = await resposta.json();
       const usuarioAtual = dados.usuario || JSON.parse(usuarioSalvo || '{}');
       setUsuario(usuarioAtual);
-      setTela('home');
-    } catch (error) {
-      console.log(error);
-      setTela('login');
+      setAutenticado(true);
+    } catch {
+      await AsyncStorage.multiRemove(['token', 'usuario']);
+      setUsuario(null);
+      setAutenticado(false);
     } finally {
       setCarregando(false);
     }
@@ -63,50 +67,30 @@ export default function App() {
     );
   }
 
-  if (tela === 'login') {
-    return (
-      <Login
-        onLogin={(usuarioLogado) => {
-          setUsuario(usuarioLogado);
-          setTela('home');
-        }}
-        onIrParaCadastro={() => setTela('cadastro')}
-      />
-    );
-  }
-
-  if (tela === 'cadastro') {
-    return (
-      <CadastroUsuario
-        onVoltar={() => setTela('login')}
-        onCriado={() => setTela('login')}
-      />
-    );
-  }
-
-  if (tela === 'home') {
-    return (
-      <Home
-        usuario={usuario}
-        onLogout={() => {
-          setUsuario(null);
-          setTela('login');
-        }}
-        onAbrirProdutos={() => setTela('produtos')}
-        onAbrirUsuarios={() => setTela('usuarios')}
-      />
-    );
-  }
-
-  if (tela === 'produtos') {
-    return <Produtos usuario={usuario} onVoltar={() => setTela('home')} />;
-  }
-
-  if (tela === 'usuarios') {
-    return <Usuarios onVoltar={() => setTela('home')} />;
-  }
-
-  return null;
+  return (
+    <NavigationContainer>
+      <StatusBar style="dark" />
+      <Stack.Navigator screenOptions={{ headerShown: false }}>
+        {autenticado ? (
+          <>
+            <Stack.Screen name="Início">
+              {(props) => <Home {...props} usuario={usuario} onLogout={async () => { await AsyncStorage.multiRemove(['token', 'usuario']); setUsuario(null); setAutenticado(false); }} />}
+            </Stack.Screen>
+            <Stack.Screen name="Aprendizado" component={Aprendizado} />
+            <Stack.Screen name="Simulador" component={Simulador} />
+            <Stack.Screen name="Histórico" component={Historico} />
+          </>
+        ) : (
+          <>
+            <Stack.Screen name="Login">
+              {(props) => <Login {...props} onLogin={(user) => { setUsuario(user); setAutenticado(true); }} />}
+            </Stack.Screen>
+            <Stack.Screen name="Cadastro" component={CadastroUsuario} />
+          </>
+        )}
+      </Stack.Navigator>
+    </NavigationContainer>
+  );
 }
 
 const styles = StyleSheet.create({

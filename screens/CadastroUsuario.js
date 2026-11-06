@@ -10,7 +10,7 @@ import {
 } from 'react-native';
 import { API } from '../services/api.js';
 
-export default function CadastroUsuario({ onVoltar, onCriado }) {
+export default function CadastroUsuario({ navigation }) {
   const [nome, setNome] = useState('');
   const [email, setEmail] = useState('');
   const [senha, setSenha] = useState('');
@@ -61,9 +61,7 @@ export default function CadastroUsuario({ onVoltar, onCriado }) {
       setSenha('');
       setConfirmarSenha('');
 
-      if (onCriado) {
-        onCriado();
-      }
+      setTimeout(() => navigation.goBack(), 700);
     } catch (error) {
       setErro(error.message || 'Não foi possível criar a conta.');
     } finally {
@@ -77,7 +75,8 @@ export default function CadastroUsuario({ onVoltar, onCriado }) {
       style={styles.container}
     >
       <View style={styles.card}>
-        <Text style={styles.title}>Criar conta</Text>
+        <Text style={styles.title}>Comece sua jornada</Text>
+        <Text style={styles.subtitle}>Crie uma conta para salvar suas simulações educativas.</Text>
 
         <TextInput
           style={styles.input}
@@ -118,7 +117,7 @@ export default function CadastroUsuario({ onVoltar, onCriado }) {
           <Text style={styles.buttonText}>{carregando ? 'Criando...' : 'Cadastrar'}</Text>
         </Pressable>
 
-        <Pressable style={styles.link} onPress={onVoltar}>
+        <Pressable style={styles.link} onPress={() => navigation.goBack()}>
           <Text style={styles.linkText}>Voltar para login</Text>
         </Pressable>
       </View>
@@ -148,6 +147,7 @@ const styles = StyleSheet.create({
     marginBottom: 18,
     color: '#111827',
   },
+  subtitle: { color: '#68756e', marginBottom: 16, lineHeight: 21 },
   input: {
     borderWidth: 1,
     borderColor: '#d1d5db',
@@ -159,7 +159,7 @@ const styles = StyleSheet.create({
     backgroundColor: '#f9fafb',
   },
   button: {
-    backgroundColor: '#10b981',
+    backgroundColor: '#176b52',
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',

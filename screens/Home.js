@@ -1,101 +1,46 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
+import { useEffect, useState } from 'react';
 import { Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
-import { API } from '../services/api.js';
+import { fetchAutenticado } from '../services/api.js';
 
-export default function Home({ usuario, onLogout, onAbrirProdutos, onAbrirUsuarios }) {
-  async function carregarPerfil() {
-    const token = await AsyncStorage.getItem('token');
-    if (!token) return;
+const verde = '#176b52';
 
-    try {
-      const resposta = await fetch(`${API}/auth/me`, {
-        headers: {
-          Authorization: `Bearer ${token}`,
-        },
-      });
-
-      if (resposta.ok) {
-        const dados = await resposta.json();
-        console.log('Perfil carregado:', dados.usuario);
-      }
-    } catch (error) {
-      console.log('Falha ao carregar perfil:', error.message);
-    }
-  }
-
+export default function Home({ navigation, usuario, onLogout }) {
+  const [resumo, setResumo] = useState(null);
+  const [erro, setErro] = useState('');
+  useEffect(() => { fetchAutenticado('/inicio').then(setResumo).catch((e) => setErro(e.message)); }, []);
+  const acessar = (tela) => navigation.navigate(tela);
   return (
     <ScrollView contentContainerStyle={styles.container}>
-      <Text style={styles.ola}>Olá, {usuario?.nome || 'Usuário'}</Text>
-      <Text style={styles.nivel}>Nível: {usuario?.nivel || 'usuario'}</Text>
-
-      <Pressable style={styles.button} onPress={onAbrirProdutos}>
-        <Text style={styles.buttonText}>Ver produtos</Text>
-      </Pressable>
-
-      {usuario?.nivel === 'admin' ? (
-        <>
-          <Pressable style={[styles.button, styles.secondary]} onPress={onAbrirUsuarios}>
-            <Text style={styles.buttonText}>Gerenciar usuários</Text>
-          </Pressable>
-        </>
-      ) : null}
-
-      <Pressable style={[styles.button, styles.danger]} onPress={async () => {
-        await AsyncStorage.removeItem('token');
-        await AsyncStorage.removeItem('usuario');
-        onLogout();
-      }}>
-        <Text style={styles.buttonText}>Sair</Text>
-      </Pressable>
-
-      <Pressable style={styles.link} onPress={carregarPerfil}>
-        <Text style={styles.linkText}>Atualizar perfil</Text>
-      </Pressable>
+      <View style={styles.topo}><Text style={styles.marca}>Trilha Financeira</Text><Pressable onPress={onLogout}><Text style={styles.sair}>Sair</Text></Pressable></View>
+      <Text style={styles.ola}>Olá, {usuario?.nome || 'estudante'} 👋</Text>
+      <Text style={styles.subtitulo}>Aprenda sobre investimentos praticando em um ambiente simulado.</Text>
+      <View style={styles.saldo}>
+        <Text style={styles.rotulo}>Saldo virtual disponível</Text>
+        <Text style={styles.valor}>{resumo ? Number(resumo.saldoVirtual).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' }) : '—'}</Text>
+        <Text style={styles.nota}>Créditos fictícios para fins educativos. Não representam dinheiro real.</Text>
+      </View>
+      {erro ? <Text style={styles.erro}>{erro}</Text> : null}
+      <Text style={styles.titulo}>Sua jornada</Text>
+      <Acao titulo="Aprender" texto="Explore conceitos do mercado financeiro" onPress={() => acessar('Aprendizado')} />
+      <Acao titulo="Simular investimento" texto="Pratique decisões sem usar dinheiro real" onPress={() => acessar('Simulador')} />
+      <Acao titulo="Histórico" texto={resumo ? `${resumo.totalSimulacoes} simulações registradas` : 'Veja suas práticas anteriores'} onPress={() => acessar('Histórico')} />
+      <View style={styles.dica}><Text style={styles.dicaTitulo}>Uma dica para começar</Text><Text style={styles.dicaTexto}>Antes de investir, entenda seus objetivos, prazo e riscos. Rentabilidade passada não garante resultados futuros.</Text></View>
     </ScrollView>
   );
 }
-
+function Acao({ titulo, texto, onPress }) {
+  return <Pressable accessibilityRole="button" style={styles.acao} onPress={onPress}><View><Text style={styles.acaoTitulo}>{titulo}</Text><Text style={styles.acaoTexto}>{texto}</Text></View><Text style={styles.seta}>›</Text></Pressable>;
+}
 const styles = StyleSheet.create({
-  container: {
-    flexGrow: 1,
-    padding: 24,
-    backgroundColor: '#f3f4f6',
-  },
-  ola: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-    color: '#111827',
-  },
-  nivel: {
-    fontSize: 16,
-    color: '#4b5563',
-    marginBottom: 20,
-  },
-  button: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  secondary: {
-    backgroundColor: '#10b981',
-  },
-  danger: {
-    backgroundColor: '#dc2626',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  link: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
+  container: { flexGrow: 1, padding: 22, paddingTop: 52, backgroundColor: '#f5f7f4' },
+  topo: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 26 },
+  marca: { color: verde, fontSize: 16, fontWeight: '800' }, sair: { color: '#647067', fontWeight: '700' },
+  ola: { color: '#18332b', fontSize: 27, fontWeight: '800' }, subtitulo: { color: '#68756e', fontSize: 15, lineHeight: 22, marginTop: 7, marginBottom: 20 },
+  saldo: { backgroundColor: verde, padding: 20, borderRadius: 20, marginBottom: 27 }, rotulo: { color: '#d6ebe2', fontSize: 14 },
+  valor: { color: 'white', fontSize: 29, fontWeight: '800', marginVertical: 7 }, nota: { color: '#d6ebe2', lineHeight: 18, fontSize: 12 },
+  titulo: { fontSize: 19, color: '#18332b', fontWeight: '800', marginBottom: 12 },
+  acao: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', padding: 17, borderRadius: 16, backgroundColor: 'white', marginBottom: 10 },
+  acaoTitulo: { color: '#18332b', fontSize: 16, fontWeight: '800' }, acaoTexto: { color: '#68756e', fontSize: 13, marginTop: 4 }, seta: { color: verde, fontSize: 26 },
+  dica: { backgroundColor: '#e8efe9', padding: 17, borderRadius: 16, marginTop: 12 }, dicaTitulo: { color: verde, fontWeight: '800', marginBottom: 6 }, dicaTexto: { color: '#52635a', lineHeight: 20 },
+  erro: { color: '#a33b35', marginBottom: 12 },
 });

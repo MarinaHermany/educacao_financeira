@@ -50,9 +50,7 @@ export async function cadastrarUsuario(req, res) {
   } catch (error) {
     console.error('ERRO ao cadastrar usuário:', error);
     return res.status(500).json({
-      mensagem: error.message || 'Erro ao cadastrar usuário.',
-      detalhe: process.env.NODE_ENV === 'production' ? undefined : error.stack,
-      sqlMessage: process.env.NODE_ENV === 'production' ? undefined : error.sqlMessage,
+      mensagem: 'Erro ao cadastrar usuário.',
     });
   }
 }
@@ -105,9 +103,7 @@ export async function login(req, res) {
   } catch (error) {
     console.error('ERRO ao fazer login:', error);
     return res.status(500).json({
-      mensagem: error.message || 'Erro ao tentar fazer login.',
-      detalhe: process.env.NODE_ENV === 'production' ? undefined : error.stack,
-      sqlMessage: process.env.NODE_ENV === 'production' ? undefined : error.sqlMessage,
+      mensagem: 'Erro ao tentar fazer login.',
     });
   }
 }

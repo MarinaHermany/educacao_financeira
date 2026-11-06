@@ -1,147 +1,42 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
-import {
-  KeyboardAvoidingView,
-  Platform,
-  Pressable,
-  StyleSheet,
-  Text,
-  TextInput,
-  View,
-} from 'react-native';
+import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { API } from '../services/api.js';
 
-export default function Login({ onLogin, onIrParaCadastro }) {
-  const [email, setEmail] = useState('usuario@loja.com');
-  const [senha, setSenha] = useState('Usuario@123');
+export default function Login({ navigation, onLogin }) {
+  const [email, setEmail] = useState('');
+  const [senha, setSenha] = useState('');
   const [erro, setErro] = useState('');
   const [carregando, setCarregando] = useState(false);
-
   async function fazerLogin() {
-    setErro('');
-    setCarregando(true);
-
+    setErro(''); setCarregando(true);
     try {
-      const resposta = await fetch(`${API}/auth/login`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ email, senha }),
-      });
-
-      const dados = await resposta.json();
-
-      if (!resposta.ok) {
-        throw new Error(dados?.mensagem || 'Erro ao fazer login.');
-      }
-
-      await AsyncStorage.setItem('token', dados.token);
-      await AsyncStorage.setItem('usuario', JSON.stringify(dados.usuario));
-      onLogin?.(dados.usuario);
-    } catch (error) {
-      setErro(error.message || 'Não foi possível entrar.');
-    } finally {
-      setCarregando(false);
-    }
+      const resposta = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), senha }) });
+      const dados = await resposta.json().catch(() => ({}));
+      if (!resposta.ok) throw new Error(dados.mensagem || 'Não foi possível entrar.');
+      await AsyncStorage.setItem('token', dados.token); await AsyncStorage.setItem('usuario', JSON.stringify(dados.usuario));
+      onLogin(dados.usuario);
+    } catch (error) { setErro(error.message); } finally { setCarregando(false); }
   }
-
-  return (
-    <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
-      <View style={styles.card}>
-        <Text style={styles.title}>Loja JWT</Text>
-        <Text style={styles.subtitle}>Entre com sua conta</Text>
-
-        <TextInput
-          style={styles.input}
-          placeholder="E-mail"
-          value={email}
-          onChangeText={setEmail}
-          autoCapitalize="none"
-          keyboardType="email-address"
-        />
-
-        <TextInput
-          style={styles.input}
-          placeholder="Senha"
-          value={senha}
-          onChangeText={setSenha}
-          secureTextEntry
-        />
-
-        {erro ? <Text style={styles.erro}>{erro}</Text> : null}
-
-        <Pressable style={styles.button} onPress={fazerLogin} disabled={carregando}>
-          <Text style={styles.buttonText}>{carregando ? 'Entrando...' : 'Entrar'}</Text>
-        </Pressable>
-
-        <Pressable style={styles.link} onPress={onIrParaCadastro}>
-          <Text style={styles.linkText}>Criar uma conta</Text>
-        </Pressable>
-      </View>
-    </KeyboardAvoidingView>
-  );
+  return <KeyboardAvoidingView behavior={Platform.OS === 'ios' ? 'padding' : 'height'} style={styles.container}>
+    <View style={styles.card}>
+      <Text style={styles.marca}>Trilha Financeira</Text><Text style={styles.title}>Aprenda a investir com confiança.</Text>
+      <Text style={styles.subtitle}>Entre para continuar sua jornada de educação financeira.</Text>
+      <TextInput style={styles.input} placeholder="E-mail" value={email} onChangeText={setEmail} autoCapitalize="none" keyboardType="email-address" autoComplete="email" />
+      <TextInput style={styles.input} placeholder="Senha" value={senha} onChangeText={setSenha} secureTextEntry autoComplete="password" />
+      {erro ? <Text accessibilityRole="alert" style={styles.erro}>{erro}</Text> : null}
+      <Pressable accessibilityRole="button" style={styles.button} onPress={fazerLogin} disabled={carregando}><Text style={styles.buttonText}>{carregando ? 'Entrando…' : 'Entrar'}</Text></Pressable>
+      <Pressable style={styles.link} onPress={() => navigation.navigate('Cadastro')}><Text style={styles.linkText}>Ainda não tem conta? Cadastre-se</Text></Pressable>
+      <Text style={styles.legal}>Conteúdo educativo. As simulações não envolvem dinheiro real nem recomendam investimentos.</Text>
+    </View>
+  </KeyboardAvoidingView>;
 }
-
 const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    justifyContent: 'center',
-    padding: 24,
-    backgroundColor: '#f3f4f6',
-  },
-  card: {
-    backgroundColor: '#fff',
-    borderRadius: 18,
-    padding: 24,
-    shadowColor: '#000',
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  title: {
-    fontSize: 28,
-    fontWeight: '700',
-    marginBottom: 8,
-    color: '#111827',
-  },
-  subtitle: {
-    fontSize: 16,
-    marginBottom: 16,
-    color: '#4b5563',
-  },
-  input: {
-    borderWidth: 1,
-    borderColor: '#d1d5db',
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 10,
-    marginBottom: 12,
-    fontSize: 16,
-    backgroundColor: '#f9fafb',
-  },
-  button: {
-    backgroundColor: '#2563eb',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-  },
-  buttonText: {
-    color: '#fff',
-    fontWeight: '700',
-    fontSize: 16,
-  },
-  erro: {
-    color: '#b91c1c',
-    marginBottom: 10,
-    fontWeight: '600',
-  },
-  link: {
-    marginTop: 18,
-    alignItems: 'center',
-  },
-  linkText: {
-    color: '#2563eb',
-    fontWeight: '600',
-  },
+  container: { flex: 1, justifyContent: 'center', padding: 22, backgroundColor: '#f5f7f4' }, card: { backgroundColor: '#fff', borderRadius: 22, padding: 23 },
+  marca: { color: '#176b52', fontSize: 15, fontWeight: '800', marginBottom: 25 }, title: { fontSize: 29, lineHeight: 35, fontWeight: '800', color: '#18332b' },
+  subtitle: { fontSize: 15, lineHeight: 22, color: '#68756e', marginTop: 9, marginBottom: 23 },
+  input: { borderWidth: 1, borderColor: '#dce4de', borderRadius: 12, paddingHorizontal: 14, paddingVertical: 13, marginBottom: 12, fontSize: 16, backgroundColor: '#fbfcfb' },
+  button: { backgroundColor: '#176b52', paddingVertical: 14, borderRadius: 12, alignItems: 'center', marginTop: 5 }, buttonText: { color: '#fff', fontWeight: '800', fontSize: 16 },
+  erro: { color: '#a33b35', marginBottom: 10, fontWeight: '600' }, link: { marginTop: 18, alignItems: 'center' }, linkText: { color: '#176b52', fontWeight: '700' },
+  legal: { color: '#849087', fontSize: 12, textAlign: 'center', lineHeight: 17, marginTop: 20 },
 });

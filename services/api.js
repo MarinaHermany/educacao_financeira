@@ -1,33 +1,15 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
-export const API = 'http://localhost:3000';
+// Defina EXPO_PUBLIC_API_URL para o destino atual: web, emulador ou IP da rede local.
+export const API = (process.env.EXPO_PUBLIC_API_URL || 'http://localhost:3000').replace(/\/$/, '');
 
 export async function fetchAutenticado(endpoint, options = {}) {
   const token = await AsyncStorage.getItem('token');
+  const headers = { 'Content-Type': 'application/json', ...(options.headers || {}) };
+  if (token) headers.Authorization = `Bearer ${token}`;
 
-  const headers = {
-    ...(options.headers || {}),
-  };
-
-  if (token) {
-    headers.Authorization = `Bearer ${token}`;
-  }
-
-  const resposta = await fetch(`${API}${endpoint}`, {
-    ...options,
-    headers,
-  });
-
-  let dados = null;
-  try {
-    dados = await resposta.json();
-  } catch (error) {
-    dados = null;
-  }
-
-  if (!resposta.ok) {
-    throw new Error(dados?.mensagem || 'Erro na requisição.');
-  }
-
+  const resposta = await fetch(`${API}${endpoint}`, { ...options, headers });
+  const dados = await resposta.json().catch(() => null);
+  if (!resposta.ok) throw new Error(dados?.mensagem || 'Não foi possível concluir a solicitação.');
   return dados;
 }
