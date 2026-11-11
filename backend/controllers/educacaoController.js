@@ -35,7 +35,7 @@ export async function obterInicio(req, res) {
 export async function listarSimulacoes(req, res) {
   try {
     const [linhas] = await db.execute(
-      'SELECT s.id, s.valor, s.resultado, s.criado_em AS criadoEm, i.nome AS investimentoNome, i.categoria FROM simulacoes s INNER JOIN investimentos i ON i.id = s.investimento_id WHERE s.usuario_id = ? ORDER BY s.criado_em DESC, s.id DESC',
+      'SELECT s.id, s.investimento_id AS investimentoId, s.valor, s.resultado, s.criado_em AS criadoEm, i.nome AS investimentoNome, i.categoria FROM simulacoes s INNER JOIN investimentos i ON i.id = s.investimento_id WHERE s.usuario_id = ? ORDER BY s.criado_em DESC, s.id DESC',
       [req.usuario.id]
     );
     return res.json(linhas);
@@ -88,6 +88,97 @@ export async function registrarSimulacao(req, res) {
     if (conexao) await conexao.rollback().catch(() => {});
     console.error('Falha ao registrar simulação:', error.message);
     return res.status(500).json({ mensagem: 'Não foi possível registrar a simulação.' });
+  } finally {
+    conexao?.release();
+  }
+}
+
+function validarIdSimulacao(valor) {
+  const id = Number(valor);
+  return Number.isSafeInteger(id) && id > 0 ? id : null;
+}
+
+export async function atualizarSimulacao(req, res) {
+  const id = validarIdSimulacao(req.params.id);
+  const investimentoId = Number(req.body?.investimentoId);
+  const valor = Number(req.body?.valor);
+  if (!id) return res.status(400).json({ mensagem: 'ID de simulação inválido.' });
+  if (!Number.isInteger(investimentoId) || investimentoId <= 0) return res.status(400).json({ mensagem: 'Escolha uma categoria válida.' });
+  if (!Number.isFinite(valor) || valor <= 0 || Math.round(valor * 100) !== valor * 100) {
+    return res.status(400).json({ mensagem: 'Informe um valor positivo com até duas casas decimais.' });
+  }
+
+  let conexao;
+  try {
+    conexao = await db.getConnection();
+    await conexao.beginTransaction();
+    const [simulacoes] = await conexao.execute(
+      'SELECT id, valor FROM simulacoes WHERE id = ? AND usuario_id = ? FOR UPDATE',
+      [id, req.usuario.id]
+    );
+    if (!simulacoes[0]) {
+      await conexao.rollback();
+      return res.status(404).json({ mensagem: 'Simulação não encontrada.' });
+    }
+    const [opcoes] = await conexao.execute('SELECT id FROM investimentos WHERE id = ? AND ativo = 1', [investimentoId]);
+    if (!opcoes[0]) {
+      await conexao.rollback();
+      return res.status(404).json({ mensagem: 'A opção de simulação não está disponível.' });
+    }
+    await conexao.execute(
+      'INSERT INTO carteiras (usuario_id, saldo_virtual) VALUES (?, ?) ON DUPLICATE KEY UPDATE usuario_id = VALUES(usuario_id)',
+      [req.usuario.id, SALDO_INICIAL]
+    );
+    const [[carteira]] = await conexao.execute('SELECT saldo_virtual FROM carteiras WHERE usuario_id = ? FOR UPDATE', [req.usuario.id]);
+    const saldo = Number(carteira.saldo_virtual);
+    const diferenca = valor - Number(simulacoes[0].valor);
+    if (diferenca > saldo) {
+      await conexao.rollback();
+      return res.status(400).json({ mensagem: 'O valor excede seu saldo virtual disponível.' });
+    }
+    const novoSaldo = (saldo - diferenca).toFixed(2);
+    await conexao.execute('UPDATE carteiras SET saldo_virtual = ? WHERE usuario_id = ?', [novoSaldo, req.usuario.id]);
+    await conexao.execute('UPDATE simulacoes SET investimento_id = ?, valor = ? WHERE id = ? AND usuario_id = ?',
+      [investimentoId, valor.toFixed(2), id, req.usuario.id]);
+    await conexao.commit();
+    return res.status(200).json({ mensagem: 'Simulação atualizada.', saldoVirtual: novoSaldo });
+  } catch (error) {
+    if (conexao) await conexao.rollback().catch(() => {});
+    console.error('Falha ao atualizar simulação:', error.message);
+    return res.status(500).json({ mensagem: 'Não foi possível atualizar a simulação.' });
+  } finally {
+    conexao?.release();
+  }
+}
+
+export async function excluirSimulacao(req, res) {
+  const id = validarIdSimulacao(req.params.id);
+  if (!id) return res.status(400).json({ mensagem: 'ID de simulação inválido.' });
+  let conexao;
+  try {
+    conexao = await db.getConnection();
+    await conexao.beginTransaction();
+    const [simulacoes] = await conexao.execute(
+      'SELECT valor FROM simulacoes WHERE id = ? AND usuario_id = ? FOR UPDATE',
+      [id, req.usuario.id]
+    );
+    if (!simulacoes[0]) {
+      await conexao.rollback();
+      return res.status(404).json({ mensagem: 'Simulação não encontrada.' });
+    }
+    await conexao.execute(
+      'INSERT INTO carteiras (usuario_id, saldo_virtual) VALUES (?, ?) ON DUPLICATE KEY UPDATE usuario_id = VALUES(usuario_id)',
+      [req.usuario.id, SALDO_INICIAL]
+    );
+    await conexao.execute('UPDATE carteiras SET saldo_virtual = saldo_virtual + ? WHERE usuario_id = ?',
+      [simulacoes[0].valor, req.usuario.id]);
+    await conexao.execute('DELETE FROM simulacoes WHERE id = ? AND usuario_id = ?', [id, req.usuario.id]);
+    await conexao.commit();
+    return res.status(200).json({ mensagem: 'Simulação excluída e saldo virtual devolvido.' });
+  } catch (error) {
+    if (conexao) await conexao.rollback().catch(() => {});
+    console.error('Falha ao excluir simulação:', error.message);
+    return res.status(500).json({ mensagem: 'Não foi possível excluir a simulação.' });
   } finally {
     conexao?.release();
   }

@@ -10,7 +10,8 @@ import Home from './screens/Home';
 import Aprendizado from './screens/Aprendizado';
 import Simulador from './screens/Simulador';
 import Historico from './screens/Historico';
-import { API } from './services/api.js';
+import { API, registrarSessaoExpirada } from './services/api.js';
+import Usuarios from './screens/Usuarios';
 
 const Stack = createNativeStackNavigator();
 
@@ -59,6 +60,11 @@ export default function App() {
     carregarSessao();
   }, []);
 
+  useEffect(() => registrarSessaoExpirada(() => {
+    setUsuario(null);
+    setAutenticado(false);
+  }), []);
+
   if (carregando) {
     return (
       <View style={styles.loadingContainer}>
@@ -79,6 +85,9 @@ export default function App() {
             <Stack.Screen name="Aprendizado" component={Aprendizado} />
             <Stack.Screen name="Simulador" component={Simulador} />
             <Stack.Screen name="Histórico" component={Historico} />
+            <Stack.Screen name="Minha conta">
+              {(props) => <Usuarios {...props} usuario={usuario} />}
+            </Stack.Screen>
           </>
         ) : (
           <>

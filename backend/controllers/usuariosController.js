@@ -1,4 +1,22 @@
 import { db } from '../database/conexao.js';
+import { validarEmail, normalizarTexto } from '../utils/validacoes.js';
+
+export async function atualizarMeuUsuario(req, res) {
+  const nome = normalizarTexto(req.body?.nome);
+  const email = normalizarTexto(req.body?.email).toLowerCase();
+  if (!nome || nome.length > 120 || !validarEmail(email) || email.length > 120) {
+    return res.status(400).json({ mensagem: 'Informe nome e e-mail válidos.' });
+  }
+  try {
+    const [existentes] = await db.execute('SELECT id FROM usuarios WHERE email = ? AND id <> ?', [email, req.usuario.id]);
+    if (existentes.length) return res.status(409).json({ mensagem: 'E-mail já cadastrado.' });
+    await db.execute('UPDATE usuarios SET nome = ?, email = ? WHERE id = ?', [nome, email, req.usuario.id]);
+    return res.status(200).json({ mensagem: 'Dados atualizados.', usuario: { ...req.usuario, nome, email } });
+  } catch (error) {
+    console.error('Falha ao atualizar perfil:', error.message);
+    return res.status(500).json({ mensagem: 'Não foi possível atualizar seus dados.' });
+  }
+}
 
 export async function listarUsuarios(req, res) {
   try {
