@@ -37,15 +37,11 @@ Roteiro de 12 slides para a defesa. Os exemplos são educativos; não representa
 
 ## Slide 6 — Arquitetura
 
-```mermaid
-flowchart LR
-  A[App React Native] -->|fetch + Bearer JWT| B[API Express]
-  B -->|mysql2 / SQL| C[(MySQL)]
-  B --> D[Middleware JWT e nível]
-  D --> B
-```
+Fluxo: App mobile (React Native) → API Express → MySQL.
 
-O endereço da API é configurado em `EXPO_PUBLIC_API_URL`. No APK, deve ser um endereço alcançável pelo telefone; localhost não serve para apontar ao computador.
+- O app envia requisições com token JWT; a API valida o acesso e consulta o banco.
+- A API retorna somente os registros do usuário autenticado.
+- No APK, configure EXPO_PUBLIC_API_URL com uma URL HTTPS acessível pelo celular; localhost aponta para o próprio aparelho.
 
 ## Slide 7 — Autenticação
 
