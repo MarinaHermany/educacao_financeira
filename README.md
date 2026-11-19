@@ -25,16 +25,17 @@ Essas relações descrevem a intenção educativa do projeto, sem alegar impacto
 - Conteúdo introdutório sobre educação financeira, bolsa, ações, investimentos, risco e retorno.
 - Consulta das categorias educativas de investimento cadastradas no MySQL.
 - Registro de simulações com créditos virtuais, com validação de saldo e histórico por usuário.
-- Histórico consultado pela API.
+- Histórico consultado pela API, com edição e exclusão das próprias simulações.
+- Tela Minha conta para atualizar nome e e-mail; administradores também podem listar usuários e alterar seus níveis.
 
 O saldo inicial virtual é R$ 10.000,00 por usuário. É apenas um crédito de demonstração. O sistema não consulta cotações, não calcula rentabilidade e não realiza operações financeiras.
 
-## Tipos de usuário e permissões previstas
+## Níveis de usuário e permissões
 
-- **Estudante/usuário:** cria uma conta, acessa os conteúdos, consulta as opções de simulação, registra simulações e consulta o próprio histórico.
-- **Administrador:** existem rotas administrativas herdadas do trabalho anterior para gestão de usuários. A interface administrativa não faz parte do fluxo principal desta etapa.
+- **Usuário:** acessa o conteúdo educativo, cria simulações e consulta, edita ou exclui somente seus registros. Também pode atualizar seus próprios dados.
+- **Administrador:** além das funções comuns, pode consultar usuários e alterar o nível de outras contas.
 
-O projeto mantém autenticação JWT já existente para as rotas protegidas. O controle administrativo completo e outras funcionalidades de autorização podem ser tratados na etapa prevista para isso.
+As permissões são verificadas pela API com os middlewares `autenticarToken` e `somenteAdmin`. O nível enviado pelo cliente não é usado para autorizar requisições.
 
 ## Telas e navegação
 
@@ -45,16 +46,41 @@ O aplicativo usa React Navigation com um stack:
 3. **Início** — resumo e acesso a aprendizado, simulador e histórico.
 4. **Aprendizado** — conceitos financeiros em cartões curtos.
 5. **Simulador** — categorias recebidas da API, saldo, valor e confirmação de registro.
-6. **Histórico** — simulações persistidas para a conta autenticada.
+6. **Histórico** — simulações persistidas para a conta autenticada, com ações para editar e excluir.
+7. **Minha conta** — atualização do perfil; a listagem e gestão de usuários aparece para administradores.
+
+O fluxo começa em Login/Cadastro. Com uma sessão válida, o stack apresenta Início, Aprendizado, Simulador, Histórico e Minha conta. Logout limpa token e usuário; respostas `401` também invalidam a sessão. Início e Histórico recarregam os dados ao receber foco.
+
+## Estrutura do repositório
+
+~~~text
+App.js                    Navegação e sessão do app
+screens/                  Telas mobile
+services/api.js            URL centralizada e fetch com Bearer
+backend/server.js          Servidor Express
+backend/routes/            Rotas de autenticação, educação e usuários
+backend/controllers/       Validações e operações no MySQL
+backend/middlewares/       JWT e autorização administrativa
+backend/database/          Pool MySQL
+database/                  Criação e migração do schema
+assets/                    Ícones e splash
+docs/                      Apresentação PPTX e roteiro Markdown
+~~~
 
 ## Tecnologias
 
 - React Native e Expo SDK 57.
 - React Navigation Native Stack.
-- AsyncStorage para persistir a sessão existente.
+- Expo SecureStore para persistir o token no Android/iOS; AsyncStorage como fallback para a sessão web.
 - Node.js, Express e fetch() para comunicação com a API.
 - MySQL com mysql2.
 - JWT para manter a autenticação já implementada.
+
+## Cadastro, JWT e Bearer Token
+
+O cadastro exige nome, e-mail válido e senha entre 8 e 72 caracteres; e-mail duplicado retorna conflito. A senha é armazenada como hash bcrypt, nunca em texto puro. O login consulta o hash, compara a credencial e emite um JWT de duas horas usando `JWT_SECRET` do backend.
+
+No Android/iOS, o token fica no Expo SecureStore (Android Keystore/iOS Keychain); o nome e e-mail não sensíveis ficam no AsyncStorage. Na web, os dois valores usam AsyncStorage como fallback. Nas rotas protegidas, `services/api.js` adiciona `Authorization: Bearer <token>`. O middleware verifica a assinatura e expiração, busca o nível atual no MySQL e preenche `req.usuario`. `somenteAdmin` bloqueia endpoints administrativos para os demais níveis.
 
 ## Estrutura do banco
 
@@ -66,6 +92,8 @@ O script database/educacao_financeira.sql cria o banco educacao_financeira e as 
 - simulacoes: categoria, valor, resultado informativo e data de cada registro.
 
 As chaves estrangeiras ligam carteira e simulações ao usuário e a categoria selecionada. O script database/migrar_usuarios.sql copia as contas do banco anterior loja_jwt, incluindo os hashes de senha. Ele deve ser executado somente se a base antiga existir. O banco antigo não é apagado.
+
+Relacionamentos: `usuarios` 1:1 `carteiras`; `usuarios` 1:N `simulacoes`; `investimentos` 1:N `simulacoes`. `simulacoes.usuario_id` e `simulacoes.investimento_id` são chaves estrangeiras; `usuarios.email` e `investimentos.nome` são únicos.
 
 ## Rotas da API
 
@@ -80,6 +108,11 @@ Rotas financeiras exigem Authorization: Bearer <token>.
 | GET | /investimentos | Lista categorias educativas do banco |
 | POST | /simulacoes | Debita saldo virtual e registra uma simulação |
 | GET | /simulacoes | Lista o histórico da conta autenticada |
+| PUT | /simulacoes/:id | Atualiza valor e categoria de uma simulação própria |
+| DELETE | /simulacoes/:id | Exclui simulação própria e devolve o crédito virtual |
+| PUT | /usuarios/me | Atualiza nome e e-mail da própria conta |
+| GET | /usuarios | Lista usuários (somente admin) |
+| PUT | /usuarios/:id/nivel | Altera nível de outro usuário (somente admin) |
 
 ## Configuração e execução
 
@@ -119,21 +152,52 @@ npm run api
 
 A API usa por padrão a porta 3000. O serviço MySQL precisa estar iniciado e acessível com as credenciais configuradas.
 
-### Aplicativo Expo
+### Aplicativo Expo e APK Android
 
-1. Copie .env.example para .env na raiz do projeto e ajuste EXPO_PUBLIC_API_URL para o endereço em que o dispositivo alcança a API.
-2. Endereços comuns: http://localhost:3000 no navegador local; http://10.0.2.2:3000 no emulador Android; no celular físico, use o IP local do computador na mesma rede Wi-Fi.
-3. Inicie o Expo:
+Para desenvolvimento, copie `.env.example` para `.env` na raiz e ajuste `EXPO_PUBLIC_API_URL` para a API: `http://localhost:3000` no navegador local, `http://10.0.2.2:3000` no emulador Android, ou o IP LAN do computador em um celular na mesma rede. Inicie o Expo com:
 
 ~~~bash
 npm start
 ~~~
 
-EXPO_PUBLIC_API_URL é incluída no bundle do cliente; não coloque senhas, chaves privadas ou outros segredos nessa variável.
+O APK não pode usar `localhost`, `127.0.0.1` ou `10.0.2.2`. É necessário hospedar a API em um endereço HTTPS acessível ao dispositivo, ou usar o IP LAN do computador durante uma demonstração na mesma rede Wi-Fi. Nesse modo local, mantenha a API ativa, libere a porta 3000 no firewall e use o mesmo Wi-Fi; mudanças de IP exigem novo build. Não invente um endereço de produção. `EXPO_PUBLIC_API_URL` é incorporada ao app e não pode conter segredos.
+
+O perfil EAS `apk` está configurado para gerar um APK interno instalável. Antes do build, configure `EXPO_PUBLIC_API_URL` como variável pública no ambiente EAS `preview`, faça login no Expo e vincule o projeto a uma conta Expo. Depois execute:
+
+~~~bash
+npx eas-cli@latest build --platform android --profile apk
+~~~
+
+Passos para configurar a conta e a URL (substitua `URL_PUBLICA_DA_API` pelo endereço real da sua API; não use esse texto literal):
+
+~~~bash
+npx eas-cli@latest login
+npx eas-cli@latest init
+npx eas-cli@latest env:set --name EXPO_PUBLIC_API_URL --value "URL_PUBLICA_DA_API" --environment preview --visibility plaintext
+~~~
+
+O comando retorna o link do artefato EAS. Baixe o APK pelo link e instale-o no Android. O APK deste projeto já foi gerado com o perfil apk no EAS. Para a demonstração atual, EXPO_PUBLIC_API_URL usa um Cloudflare Quick Tunnel; a URL é temporária e requer que o túnel e a API permaneçam ativos. O hook de build interrompe a geração se a URL estiver ausente ou usar loopback/emulador.
+
+### Admin inicial
+
+Defina `ADMIN_NOME`, `ADMIN_EMAIL` e `ADMIN_SENHA` em `backend/.env` e execute `npm run criar-admin`. O script grava a senha com bcrypt e não cria outra conta se esse e-mail já existir. Não versionar o `.env` nem reutilizar a senha de desenvolvimento na entrega.
+
+### Testes executados
+
+- `npm run lint` passou.
+- `npx expo-doctor` passou em 21/21 verificações após atualizar Expo para a versão patch requerida pelo SDK 57.
+- `npx expo export --platform web` e `--platform android` passaram; são compilações dos bundles JS, não builds nativos/APK.
+- Testes de integração com a API e o MySQL cobriram cadastro, duplicidade, bcrypt, login, JWT ausente/inválido/expirado, permissões de admin, CRUD, isolamento entre contas, edição e persistência após novo login.
+- O build EAS do perfil apk foi concluído e o APK foi gerado. A instalação e validação em dispositivo Android real ainda precisam ser feitas.
+- `npm audit` reporta avisos: 9 no total (8 moderados e 1 alto), sendo 3 moderados na árvore de produção e nenhum alto nela. A correção sugerida para a cadeia Expo exige downgrade de SDK; não apliquei um downgrade incompatível.
+
+O projeto é JavaScript e não contém `tsconfig.json`; portanto, `tsc --noEmit` não funciona como typecheck deste repositório.
 
 ## Arquivos de apoio
 
 - backend/.env.example: modelo fictício para configuração da API.
 - .env.example: endereço configurável da API para o aplicativo.
+- docs/apresentacao.pptx: apresentação de 12 slides.
+- docs/apresentacao.md: roteiro-fonte da apresentação.
 - database/loja_jwt.sql: script antigo descontinuado; use os scripts de educação financeira acima.
 

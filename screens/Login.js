@@ -1,7 +1,7 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { useState } from 'react';
 import { KeyboardAvoidingView, Platform, Pressable, StyleSheet, Text, TextInput, View } from 'react-native';
 import { API } from '../services/api.js';
+import { saveSession } from '../services/sessionStorage';
 
 export default function Login({ navigation, onLogin }) {
   const [email, setEmail] = useState('');
@@ -14,7 +14,7 @@ export default function Login({ navigation, onLogin }) {
       const resposta = await fetch(`${API}/auth/login`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify({ email: email.trim(), senha }) });
       const dados = await resposta.json().catch(() => ({}));
       if (!resposta.ok) throw new Error(dados.mensagem || 'Não foi possível entrar.');
-      await AsyncStorage.setItem('token', dados.token); await AsyncStorage.setItem('usuario', JSON.stringify(dados.usuario));
+      await saveSession(dados.token, dados.usuario);
       onLogin(dados.usuario);
     } catch (error) { setErro(error.message); } finally { setCarregando(false); }
   }

@@ -1,4 +1,3 @@
-import AsyncStorage from '@react-native-async-storage/async-storage';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
 import { StatusBar } from 'expo-status-bar';
@@ -12,6 +11,7 @@ import Simulador from './screens/Simulador';
 import Historico from './screens/Historico';
 import { API, registrarSessaoExpirada } from './services/api.js';
 import Usuarios from './screens/Usuarios';
+import { clearSession, getSessionToken, getStoredUser } from './services/sessionStorage';
 
 const Stack = createNativeStackNavigator();
 
@@ -22,12 +22,12 @@ export default function App() {
 
   async function carregarSessao() {
     try {
-      const token = await AsyncStorage.getItem('token');
-      const usuarioSalvo = await AsyncStorage.getItem('usuario');
+      const token = await getSessionToken();
+      const usuarioSalvo = await getStoredUser();
 
       if (!token) {
         setUsuario(null);
-        await AsyncStorage.removeItem('usuario');
+        await clearSession();
         return;
       }
 
@@ -38,7 +38,7 @@ export default function App() {
       });
 
       if (!resposta.ok) {
-        await AsyncStorage.multiRemove(['token', 'usuario']);
+        await clearSession();
         setUsuario(null);
         return;
       }
@@ -48,7 +48,7 @@ export default function App() {
       setUsuario(usuarioAtual);
       setAutenticado(true);
     } catch {
-      await AsyncStorage.multiRemove(['token', 'usuario']);
+      await clearSession();
       setUsuario(null);
       setAutenticado(false);
     } finally {
@@ -80,7 +80,7 @@ export default function App() {
         {autenticado ? (
           <>
             <Stack.Screen name="Início">
-              {(props) => <Home {...props} usuario={usuario} onLogout={async () => { await AsyncStorage.multiRemove(['token', 'usuario']); setUsuario(null); setAutenticado(false); }} />}
+              {(props) => <Home {...props} usuario={usuario} onLogout={async () => { await clearSession(); setUsuario(null); setAutenticado(false); }} />}
             </Stack.Screen>
             <Stack.Screen name="Aprendizado" component={Aprendizado} />
             <Stack.Screen name="Simulador" component={Simulador} />

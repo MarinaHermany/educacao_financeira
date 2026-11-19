@@ -31,6 +31,6 @@ app.use((err, req, res, next) => {
   res.status(500).json({ mensagem: 'Erro interno do servidor.' });
 });
 
-app.listen(ambiente.port, () => {
+app.listen(ambiente.port, '127.0.0.1', () => {
   console.log(`API executando em http://localhost:${ambiente.port}`);
 });
